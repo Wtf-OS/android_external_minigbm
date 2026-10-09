@@ -107,6 +107,13 @@ static struct driver *init_try_node(int idx, char const *str)
 	if (fd < 0)
 		return NULL;
 
+	// Allocation on a primary node must not reserve KMS master from the composer.
+	if (drmGetNodeTypeFromFd(fd) == DRM_NODE_PRIMARY && drmIsMaster(fd) &&
+	    drmDropMaster(fd) != 0) {
+		close(fd);
+		return NULL;
+	}
+
 	drv = drv_create(fd);
 	if (!drv)
 		close(fd);
@@ -181,6 +188,13 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 
 	drv_resolve_format_and_use_flags(drv_.get(), descriptor->drm_format, descriptor->use_flags,
 					 &resolved_format, &resolved_use_flags);
+
+	// simpledrm cannot scan out ARGB. Native DRM client targets must retain
+	// alpha when composed above device layers (e.g. wallpaper behind SystemUI).
+	if (!strcmp(drv_get_name(drv_.get()), "simpledrm") &&
+	    (descriptor->droid_usage & GRALLOC_USAGE_HW_FB) &&
+	    resolved_format == DRM_FORMAT_ARGB8888)
+		resolved_format = DRM_FORMAT_XRGB8888;
 
 	combo = drv_get_combination(drv_.get(), resolved_format, resolved_use_flags);
 	if (!combo && (descriptor->droid_usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) &&
@@ -351,7 +365,9 @@ destroy_hnd:
 	native_handle_close(hnd);
 	native_handle_delete(hnd);
 
-	drv_bo_destroy(bo);
+	// Once created, buffer owns bo and destroys it on leaving this scope.
+	if (!buffer)
+		drv_bo_destroy(bo);
 	return ret;
 }
 
