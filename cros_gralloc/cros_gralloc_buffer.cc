@@ -47,6 +47,9 @@ cros_gralloc_buffer::create(struct bo *acquire_bo,
 int32_t
 cros_gralloc_buffer::initialize_metadata(const struct cros_gralloc_buffer_descriptor *descriptor)
 {
+	if (!descriptor->enable_metadata_fd)
+		return 0;
+
 	struct cros_gralloc_buffer_metadata *metadata;
 
 	int ret = get_metadata(&metadata);
