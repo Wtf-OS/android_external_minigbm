@@ -143,7 +143,7 @@ static int gralloc0_init(struct gralloc0_module *mod, bool initialize_alloc)
 {
 	std::lock_guard<std::mutex> lock(mod->initialization_mutex);
 
-	if (mod->initialized)
+	if (mod->initialized && (!initialize_alloc || mod->alloc))
 		return 0;
 
 	mod->driver = cros_gralloc_driver::get_instance();
@@ -168,11 +168,6 @@ static int gralloc0_open(const struct hw_module_t *mod, const char *name, struct
 {
 	auto const_module = reinterpret_cast<const struct gralloc0_module *>(mod);
 	auto module = const_cast<struct gralloc0_module *>(const_module);
-
-	if (module->initialized) {
-		*dev = &module->alloc->common;
-		return 0;
-	}
 
 	if (strcmp(name, GRALLOC_HARDWARE_GPU0)) {
 		ALOGE("Incorrect device name - %s.", name);

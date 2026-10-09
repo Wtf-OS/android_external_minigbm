@@ -75,6 +75,7 @@ INIT_DUMB_DRIVER_WITH_NAME(sun4i_drm, "sun4i-drm")
 INIT_DUMB_DRIVER(synaptics)
 INIT_DUMB_DRIVER(udl)
 INIT_DUMB_DRIVER(vkms)
+INIT_DUMB_DRIVER(simpledrm)
 
 #ifndef DRV_ROCKCHIP
 INIT_DUMB_DRIVER(rockchip)
