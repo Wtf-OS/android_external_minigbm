@@ -247,7 +247,7 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 	va_list args;
 	int32_t *out_format, ret;
 	uint64_t *out_store;
-	buffer_handle_t handle;
+	buffer_handle_t handle = nullptr;
 	cros_gralloc_handle_t hnd;
 	uint32_t *out_width, *out_height, *out_stride;
 	uint32_t strides[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
@@ -278,6 +278,7 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 		/* retrieve handles for ops with buffer_handle_t */
 		handle = va_arg(args, buffer_handle_t);
 		if (!handle) {
+			va_end(args);
 			ALOGE("Invalid buffer handle.");
 			return -EINVAL;
 		}
@@ -286,6 +287,12 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 			va_end(args);
 			ALOGE("Invalid handle.");
 			return -EINVAL;
+		}
+		// Mapper5 imports handles in a different driver instance from gralloc0.
+		ret = mod->driver->retain(handle);
+		if (ret) {
+			va_end(args);
+			return ret;
 		}
 		break;
 	case GRALLOC_DRM_GET_USAGE:
@@ -373,6 +380,11 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 		ret = -EINVAL;
 	}
 
+	if (handle) {
+		int32_t release_ret = mod->driver->release(handle);
+		if (!ret)
+			ret = release_ret;
+	}
 	va_end(args);
 
 	return ret;
