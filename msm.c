@@ -298,6 +298,14 @@ static int msm_init(struct driver *drv)
 	return 0;
 }
 
+static bool msm_cpu_only_blob(const struct bo *bo)
+{
+	const uint64_t cpu = BO_USE_SW_READ_OFTEN | BO_USE_SW_READ_RARELY |
+			     BO_USE_SW_WRITE_OFTEN | BO_USE_SW_WRITE_RARELY;
+	return bo->meta.format == DRM_FORMAT_R8 && bo->meta.height == 1 &&
+	       (bo->meta.use_flags & cpu) && !(bo->meta.use_flags & ~(cpu | BO_USE_LINEAR));
+}
+
 static int msm_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t height,
 				      uint32_t format, const uint64_t modifier)
 {
@@ -307,7 +315,9 @@ static int msm_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
 	bo->meta.tiling = (modifier == DRM_FORMAT_MOD_QCOM_COMPRESSED) ? MSM_UBWC_TILING : 0;
 	msm_calculate_layout(bo);
 
-	req.flags = MSM_BO_WC | MSM_BO_SCANOUT;
+    /* Cached CPU-only blobs never reach devices needing cache maintenance. */
+    bo->meta.cached = modifier == DRM_FORMAT_MOD_LINEAR && msm_cpu_only_blob(bo);
+    req.flags = bo->meta.cached ? MSM_BO_CACHED : (MSM_BO_WC | MSM_BO_SCANOUT);
 	req.size = bo->meta.total_size;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MSM_GEM_NEW, &req);
